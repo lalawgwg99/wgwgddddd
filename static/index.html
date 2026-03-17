@@ -5,561 +5,408 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Energy Label Saver</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&family=Noto+Sans+TC:wght@300;400;500&display=swap');
-
         :root {
-            --bg: #FAFAF8;
-            --surface: #FFFFFF;
-            --text: #1A1A1A;
-            --text-light: #999999;
-            --text-mid: #666666;
-            --border: #E8E8E6;
-            --accent: #1A1A1A;
-            --accent-hover: #333333;
-            --success: #2D8A4E;
-            --error: #C0392B;
-            --serif: 'Noto Serif TC', 'Georgia', 'Times New Roman', serif;
-            --sans: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+            --bg-color: #F5F5F7;
+            --container-bg: #FFFFFF;
+            --text-primary: #1D1D1F;
+            --text-secondary: #86868B;
+            --border-color: #D2D2D7;
+            --accent-color: #0071E3;
+            --accent-hover: #0077ED;
+            --success-color: #34C759;
+            --error-color: #FF3B30;
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro TC", "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
         }
 
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg: #111110;
-                --surface: #1A1A19;
-                --text: #E8E8E6;
-                --text-light: #666666;
-                --text-mid: #999999;
-                --border: #2A2A28;
-                --accent: #E8E8E6;
-                --accent-hover: #CCCCCC;
-                --success: #4CAF7D;
-                --error: #E57373;
+                --bg-color: #000000;
+                --container-bg: #1C1C1E;
+                --text-primary: #F5F5F7;
+                --text-secondary: #86868B;
+                --border-color: #38383A;
+                --accent-color: #0A84FF;
+                --accent-hover: #007AFF;
             }
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
         body {
-            font-family: var(--sans);
-            background-color: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
+            font-family: var(--font-stack);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 40px 20px;
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            justify-content: center;
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        .page {
+        .container {
+            background-color: var(--container-bg);
+            border-radius: 18px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
+            padding: 32px;
             width: 100%;
-            max-width: 540px;
-            padding: 80px 24px 40px;
-            flex: 1;
+            max-width: 600px;
+            transition: box-shadow 0.3s ease;
         }
 
-        /* Header - Editorial Style */
-        .masthead {
-            text-align: center;
-            margin-bottom: 56px;
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
         }
 
-        .masthead-rule {
-            width: 48px;
-            height: 1.5px;
-            background: var(--text);
-            margin: 0 auto 20px;
+        p.subtitle {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-top: 0;
+            margin-bottom: 24px;
+            line-height: 1.4;
         }
 
-        .masthead h1 {
-            font-family: var(--serif);
-            font-size: 32px;
-            font-weight: 900;
-            letter-spacing: 0.08em;
-            margin-bottom: 12px;
+        .input-group {
+            margin-bottom: 24px;
         }
 
-        .masthead .tagline {
+        label {
+            display: block;
             font-size: 13px;
-            font-weight: 300;
-            color: var(--text-light);
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-        }
-
-        /* Section Labels */
-        .section-label {
-            font-size: 10px;
             font-weight: 500;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--text-light);
-            margin-bottom: 12px;
-        }
-
-        /* Path Section */
-        .path-section {
-            margin-bottom: 40px;
-            display: none;
-        }
-
-        .path-current {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 14px 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 13px;
-            color: var(--text-mid);
-            font-weight: 300;
-        }
-
-        .path-current svg {
-            width: 14px;
-            height: 14px;
-            fill: var(--text-light);
-            flex-shrink: 0;
-        }
-
-        .path-current span {
-            word-break: break-all;
-        }
-
-        .path-edit {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-        }
-
-        .path-edit input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            border-bottom: 1px solid var(--border);
-            padding: 10px 0;
-            font-family: var(--sans);
-            font-size: 13px;
-            font-weight: 300;
-            color: var(--text);
-            outline: none;
-            transition: border-color 0.3s;
-        }
-
-        .path-edit input:focus {
-            border-color: var(--text);
-        }
-
-        .path-edit input::placeholder {
-            color: var(--text-light);
-        }
-
-        .btn-text-link {
-            background: none;
-            border: none;
-            font-family: var(--sans);
-            font-size: 12px;
-            font-weight: 500;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--text-mid);
-            cursor: pointer;
-            padding: 10px 0;
-            transition: color 0.2s;
-            white-space: nowrap;
-        }
-
-        .btn-text-link:hover {
-            color: var(--text);
-        }
-
-        /* Textarea */
-        .input-section {
-            margin-bottom: 40px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
         }
 
         textarea {
             width: 100%;
-            background: transparent;
-            border: none;
-            border-bottom: 1px solid var(--border);
-            padding: 16px 0;
-            font-family: var(--sans);
+            box-sizing: border-box;
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-family: var(--font-stack);
             font-size: 15px;
-            font-weight: 300;
-            color: var(--text);
-            resize: none;
-            min-height: 140px;
-            line-height: 1.8;
-            outline: none;
-            transition: border-color 0.3s;
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 120px;
+            line-height: 1.5;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         textarea:focus {
-            border-color: var(--text);
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
         }
 
-        textarea::placeholder {
-            color: var(--text-light);
-            font-weight: 300;
-        }
-
-        /* Action Row */
-        .action-row {
+        .folder-section {
+            background: rgba(0, 113, 227, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 48px;
+            justify-content: space-between;
         }
 
-        .mode-badge {
-            font-size: 10px;
-            font-weight: 500;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: var(--text-light);
-            padding: 6px 12px;
-            border: 1px solid var(--border);
-            border-radius: 2px;
+        .folder-info {
+            flex: 1;
+            margin-right: 12px;
         }
 
-        .btn-primary {
-            background: var(--accent);
-            color: var(--bg);
-            border: none;
-            padding: 14px 32px;
-            font-family: var(--sans);
+        .folder-label {
             font-size: 12px;
-            font-weight: 500;
-            letter-spacing: 0.15em;
+            font-weight: 600;
+            color: var(--accent-color);
             text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .folder-path {
+            font-size: 14px;
+            color: var(--text-primary);
+            word-break: break-all;
+            font-weight: 500;
+        }
+
+        .button-secondary {
+            background-color: rgba(120, 120, 128, 0.16);
+            color: var(--accent-color);
+            border: none;
+            border-radius: 14px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background-color 0.2s;
+        }
+
+        .button-secondary:hover {
+            background-color: rgba(120, 120, 128, 0.25);
+        }
+
+        .button-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-top: 16px;
+        }
+
+        button.primary {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 22px;
+            padding: 12px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             align-items: center;
             gap: 10px;
+            box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
         }
 
-        .btn-primary:hover {
-            background: var(--accent-hover);
+        button.primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 113, 227, 0.4);
         }
 
-        .btn-primary:active {
-            transform: scale(0.98);
+        button.primary:active {
+            transform: translateY(0);
         }
 
-        .btn-primary:disabled {
-            opacity: 0.3;
+        button.primary:disabled {
+            background-color: var(--text-secondary);
+            opacity: 0.5;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
-        .spinner {
-            width: 12px;
-            height: 12px;
-            border: 1.5px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            display: none;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            .spinner {
-                border-color: rgba(0,0,0,0.3);
-                border-top-color: #000;
-            }
-        }
-
-        .btn-primary.loading .spinner { display: block; }
-        .btn-primary.loading .btn-label { display: none; }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Results */
+        /* Results List */
         .results-section {
+            margin-top: 32px;
             display: none;
         }
 
-        .results-section .section-label {
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 0;
+        .results-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
         }
 
         .result-list {
             list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 300px;
+            overflow-y: auto;
         }
 
         .result-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 16px 0;
-            border-bottom: 1px solid var(--border);
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
             font-size: 14px;
         }
 
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
         .result-model {
-            font-family: var(--sans);
-            font-weight: 400;
-            letter-spacing: 0.02em;
+            font-weight: 500;
         }
 
         .result-status {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 12px;
-            font-weight: 300;
-            color: var(--text-light);
+            font-size: 13px;
         }
 
-        .status-indicator {
-            width: 6px;
-            height: 6px;
+        .status-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: var(--text-light);
+            background-color: var(--text-secondary);
         }
 
-        .status-indicator.success { background: var(--success); }
-        .status-indicator.error { background: var(--error); }
-        .status-indicator.pending {
-            background: #D4A843;
-            animation: pulse 1.5s ease-in-out infinite;
-        }
+        .status-dot.success { background-color: var(--success-color); }
+        .status-dot.error { background-color: var(--error-color); }
+        .status-dot.pending { background-color: #FF9F0A; animation: pulse 1.5s infinite; }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
 
-        .result-status .error-text {
-            color: var(--error);
+        .spinner {
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 2px solid #fff;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: none;
         }
 
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 40px 24px 32px;
-            width: 100%;
+        button.loading .spinner {
+            display: inline-block;
+        }
+        button.loading .btn-text {
+            display: none;
         }
 
-        .footer-rule {
-            width: 32px;
-            height: 1px;
-            background: var(--border);
-            margin: 0 auto 16px;
-        }
-
-        .footer-brand {
-            font-family: var(--serif);
-            font-size: 14px;
-            font-weight: 600;
-            letter-spacing: 0.15em;
-            color: var(--text-light);
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
 
-<div class="page">
-    <!-- Masthead -->
-    <header class="masthead">
-        <div class="masthead-rule"></div>
-        <h1>能效標章</h1>
-        <div class="tagline">Energy Label Saver</div>
-    </header>
+<div class="container">
+    <h1>分級圖檔下載器</h1>
+    <p class="subtitle">輸入型號，將產品類別設為「全部」並自動抓取正式分級圖檔。</p>
 
-    <!-- Path Selection (Local Mode Only) -->
-    <div id="pathSection" class="path-section">
-        <div class="section-label">儲存路徑</div>
-        <div class="path-current">
-            <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-            <span id="currentPath">~/Desktop/分級</span>
+    <div class="folder-section">
+        <div class="folder-info">
+            <div class="folder-label">儲存資料夾</div>
+            <div id="folderPath" class="folder-path">讀取中...</div>
         </div>
-        <div class="path-edit">
-            <input type="text" id="pathInput" placeholder="輸入新的儲存路徑">
-            <button class="btn-text-link" id="setPathBtn" onclick="setCustomPath()">變更</button>
-        </div>
+        <button class="button-secondary" onclick="selectFolder()">選擇資料夾</button>
     </div>
 
-    <!-- Model Input -->
-    <div class="input-section">
-        <div class="section-label">產品型號</div>
-        <textarea id="models" placeholder="每行輸入一組型號&#10;RXV50ZVLT&#10;RXV60ZVLT"></textarea>
+    <div class="input-group">
+        <label for="models">型號列表 (每行一個)</label>
+        <textarea id="models" placeholder="例如：&#10;RXV50ZVLT&#10;RXV60ZVLT"></textarea>
     </div>
 
-    <!-- Action -->
-    <div class="action-row">
-        <div class="mode-badge" id="modeBadge">雲端模式</div>
-        <button id="downloadBtn" class="btn-primary" onclick="startDownload()">
-            <span class="btn-label" id="btnText">開始下載</span>
+    <div class="button-row">
+        <button id="downloadBtn" class="primary" onclick="startDownload()">
+            <span class="btn-text">開始抓取圖檔</span>
             <div class="spinner"></div>
         </button>
     </div>
 
-    <!-- Results -->
     <div id="resultsSection" class="results-section">
-        <div class="section-label">下載進度</div>
+        <div class="results-title">執行結果</div>
         <ul id="resultList" class="result-list"></ul>
     </div>
 </div>
 
-<!-- Footer -->
-<footer class="footer">
-    <div class="footer-rule"></div>
-    <div class="footer-brand">ＷＧ德</div>
-</footer>
-
 <script>
-    let isLocalMode = false;
-    let currentSavePath = '~/Desktop/分級';
-
-    async function detectMode() {
-        const h = window.location.hostname;
-        isLocalMode = (h === 'localhost' || h === '127.0.0.1');
-
-        if (isLocalMode) {
-            document.getElementById('pathSection').style.display = 'block';
-            document.getElementById('modeBadge').textContent = '本地模式';
-            document.getElementById('btnText').textContent = '搜尋並存檔';
-            try {
-                const r = await fetch('/api/get-path');
-                const d = await r.json();
-                currentSavePath = d.path;
-                document.getElementById('currentPath').textContent = currentSavePath;
-            } catch (e) {
-                console.error(e);
-            }
-        } else {
-            document.getElementById('pathSection').style.display = 'none';
-            document.getElementById('modeBadge').textContent = '雲端模式';
-            document.getElementById('btnText').textContent = '搜尋並下載';
+    // 初始化路徑
+    async function init() {
+        try {
+            const resp = await fetch('/api/config');
+            const data = await resp.json();
+            document.getElementById('folderPath').textContent = data.save_dir;
+        } catch (e) {
+            document.getElementById('folderPath').textContent = '無法連線伺服器';
         }
     }
 
-    window.addEventListener('DOMContentLoaded', detectMode);
-
-    async function setCustomPath() {
-        const input = document.getElementById('pathInput');
-        const path = input.value.trim();
-        if (!path) return;
-
-        const btn = document.getElementById('setPathBtn');
-        btn.disabled = true;
+    async function selectFolder() {
         try {
-            const r = await fetch('/api/set-path', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path })
-            });
-            const d = await r.json();
-            if (r.ok) {
-                currentSavePath = d.path;
-                document.getElementById('currentPath').textContent = currentSavePath;
-                input.value = '';
-            } else {
-                alert(d.detail || d.message || '設定失敗');
+            const resp = await fetch('/api/select-folder', { method: 'POST' });
+            const data = await resp.json();
+            if (data.status === 'success') {
+                document.getElementById('folderPath').textContent = data.path;
+                // 同步回後端
+                await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ save_dir: data.path })
+                });
             }
         } catch (e) {
-            alert('連線錯誤: ' + e.message);
-        } finally {
-            btn.disabled = false;
+            alert('選取失敗: ' + e);
         }
     }
 
     async function startDownload() {
         const textarea = document.getElementById('models');
         const btn = document.getElementById('downloadBtn');
-        const section = document.getElementById('resultsSection');
-        const list = document.getElementById('resultList');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultList = document.getElementById('resultList');
 
         const text = textarea.value.trim();
-        if (!text) { textarea.focus(); return; }
+        if (!text) {
+            textarea.focus();
+            return;
+        }
 
-        const models = text.split('\n').map(m => m.trim()).filter(Boolean);
-        if (!models.length) return;
+        const models = text.split('\n').map(m => m.trim()).filter(m => m);
+        if (models.length === 0) return;
 
         btn.classList.add('loading');
         btn.disabled = true;
-        section.style.display = 'block';
-        list.innerHTML = '';
+        resultsSection.style.display = 'block';
+        resultList.innerHTML = '';
 
         models.forEach(model => {
             const li = document.createElement('li');
             li.className = 'result-item';
-            li.id = 'r-' + model.replace(/[^a-zA-Z0-9]/g, '_');
+            li.id = `item-${model.replace(/[^a-zA-Z0-9]/g, '_')}`;
             li.innerHTML = `
                 <div class="result-model">${model}</div>
                 <div class="result-status">
-                    <div class="status-indicator pending"></div>
-                    <span class="status-text">處理中</span>
-                </div>`;
-            list.appendChild(li);
+                    <div class="status-dot pending"></div>
+                    <span class="status-text">搜尋中...</span>
+                </div>
+            `;
+            resultList.appendChild(li);
         });
 
         try {
-            const payload = { models };
-            if (isLocalMode) payload.save_path = currentSavePath;
-
-            const r = await fetch('/api/download', {
+            const response = await fetch('/api/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ models: models })
             });
-            const data = await r.json();
 
-            if (r.ok) {
+            const data = await response.json();
+            
+            if (response.ok) {
                 data.results.forEach(res => {
-                    const id = 'r-' + res.model.replace(/[^a-zA-Z0-9]/g, '_');
-                    const li = document.getElementById(id);
-                    if (!li) return;
-                    const dot = li.querySelector('.status-indicator');
-                    const txt = li.querySelector('.status-text');
-                    dot.className = 'status-indicator';
-
-                    if (res.result.status === 'success') {
-                        dot.classList.add('success');
-                        txt.textContent = isLocalMode ? '已存檔' : '已下載';
-                        if (!isLocalMode && res.result.imageData) {
-                            triggerDownload(res.model, res.result.imageData);
+                    const safeId = `item-${res.model.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    const li = document.getElementById(safeId);
+                    if (li) {
+                        const dot = li.querySelector('.status-dot');
+                        const textElement = li.querySelector('.status-text');
+                        dot.className = 'status-dot';
+                        if (res.result.status === 'success') {
+                            dot.classList.add('success');
+                            textElement.textContent = '成功';
+                        } else {
+                            dot.classList.add('error');
+                            textElement.textContent = res.result.message;
                         }
-                    } else {
-                        dot.classList.add('error');
-                        txt.textContent = res.result.message;
-                        txt.classList.add('error-text');
                     }
                 });
-            } else {
-                alert(data.detail || data.error || '請求失敗');
             }
-        } catch (e) {
-            alert('連線錯誤: ' + e.message);
+        } catch (err) {
+            alert('連線外洩或後端出錯');
         } finally {
             btn.classList.remove('loading');
             btn.disabled = false;
         }
     }
 
-    function triggerDownload(model, base64Data) {
-        try {
-            const bin = atob(base64Data);
-            const arr = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-            const blob = new Blob([arr], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = model.replace('/', '_') + '.jpg';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 200);
-        } catch (e) {
-            console.error('Download failed:', model, e);
-        }
-    }
+    window.onload = init;
 </script>
 
 </body>
