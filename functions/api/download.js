@@ -1,227 +1,260 @@
-// Cloudflare Pages Function - Energy Label Saver
-// Two-step ASP.NET search: GET form state → POST with all params
+/**
+ * Cloudflare Pages Function - Energy Label Saver
+ *
+ * 526 SSL 修復說明：
+ * Cloudflare Worker 的 fetch() 無法跳過 SSL 驗證。
+ * 解決方案：優先使用 HTTP（無 SSL），同時告訴 CF 略過憑證錯誤。
+ */
 
-const TARGET_BASE_URL = "https://ranking.energylabel.org.tw/product/Approval";
+// 優先嘗試 HTTP，因為 CF Workers 無法忽略無效 SSL 憑證 (526)
+const TARGET_HTTP  = "http://ranking.energylabel.org.tw/product/Approval";
+const TARGET_HTTPS = "https://ranking.energylabel.org.tw/product/Approval";
 
-const HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+const BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8",
+    "Cache-Control": "no-cache",
 };
 
-function extractAspNetFields(html) {
-    const fields = {};
-    const pattern = /<input[^>]+type="hidden"[^>]*>/gi;
-    let match;
-    while ((match = pattern.exec(html)) !== null) {
-        const tag = match[0];
-        const nameMatch = tag.match(/name="([^"]+)"/);
-        const valueMatch = tag.match(/value="([^"]*)"/);
-        if (nameMatch) {
-            fields[nameMatch[1]] = valueMatch ? valueMatch[1] : '';
+const CORS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+};
+
+// 嘗試帶 CF 選項的 fetch（允許較舊 TLS、跳過不安全連線）
+async function cfFetch(url, options = {}) {
+    const cfOptions = {
+        ...options,
+        cf: {
+            // 告訴 Cloudflare 對這個 fetch 放寬 SSL 要求
+            minTLSVersion: "TLSv1",
+            ...(options.cf || {})
         }
+    };
+    return fetch(url, cfOptions);
+}
+
+// 自動切換 HTTP/HTTPS 嘗試
+async function robustFetch(path, options = {}) {
+    const urls = [
+        TARGET_HTTP  + path,   // 先試 HTTP（避開 SSL 問題）
+        TARGET_HTTPS + path,   // 再試 HTTPS
+    ];
+    let lastError = null;
+    for (const url of urls) {
+        try {
+            const resp = await cfFetch(url, {
+                ...options,
+                headers: { ...BROWSER_HEADERS, ...(options.headers || {}) }
+            });
+            if (resp.ok) return resp;
+            if (resp.status === 526 || resp.status === 525) continue; // SSL 問題，換另一個
+            return resp; // 其他狀態碼直接回傳
+        } catch (e) {
+            lastError = e;
+        }
+    }
+    throw lastError || new Error("All fetch attempts failed");
+}
+
+function extractHiddenFields(html) {
+    const fields = {};
+    const re = /<input[^>]+type=["']hidden["'][^>]*>/gi;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+        const tag = m[0];
+        const name  = (tag.match(/name=["']([^"']+)["']/i) || [])[1];
+        const value = (tag.match(/value=["']([^"']*)["']/i) || [])[1] || "";
+        if (name) fields[name] = value;
     }
     return fields;
 }
 
-function findSelectNames(html) {
-    // Find all <select name="..."> elements
-    const selectPattern = /<select[^>]+name="([^"]+)"[^>]*>/gi;
-    const selects = [];
+function extractSelectNames(html) {
+    const names = [];
+    const re = /<select[^>]+name=["']([^"']+)["'][^>]*>/gi;
     let m;
-    while ((m = selectPattern.exec(html)) !== null) {
-        selects.push(m[1]);
+    while ((m = re.exec(html)) !== null) names.push(m[1]);
+    return names;
+}
+
+function extractFirstTextInput(html) {
+    const re = /<input[^>]+type=["']text["'][^>]*>/gi;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+        const tag = m[0];
+        const name = (tag.match(/name=["']([^"']+)["']/i) || [])[1];
+        const id   = ((tag.match(/id=["']([^"']+)["']/i) || [])[1] || "").toLowerCase();
+        if (name && (id.includes("key") || id.includes("search") || id.includes("txt") || id.includes("model"))) {
+            return name;
+        }
     }
-    return selects;
+    // fallback: 第一個 text input
+    re.lastIndex = 0;
+    const first = re.exec(html);
+    if (first) return (first[0].match(/name=["']([^"']+)["']/i) || [])[1] || null;
+    return null;
 }
 
-function findTextInputName(html) {
-    // Find <input type="text" name="...">
-    const pattern = /<input[^>]+type="text"[^>]+name="([^"]+)"/gi;
-    const m = pattern.exec(html);
-    return m ? m[1] : null;
+function extractSubmitButton(html) {
+    const re = /<input[^>]+type=["']submit["'][^>]*>/gi;
+    const m = re.exec(html);
+    if (!m) return null;
+    const tag = m[0];
+    const name  = (tag.match(/name=["']([^"']+)["']/i) || [])[1];
+    const value = (tag.match(/value=["']([^"']+)["']/i) || [])[1] || "搜尋";
+    return name ? { name, value } : null;
 }
 
-function findSubmitButtonName(html) {
-    const pattern = /<input[^>]+type="submit"[^>]+name="([^"]+)"/gi;
-    const m = pattern.exec(html);
+async function searchModel(model) {
+    // === Step 1: GET 頁面，拿表單狀態 ===
+    let pageHtml = null;
+    try {
+        const pageResp = await robustFetch("/list.aspx", {
+            headers: { Referer: TARGET_HTTP + "/list.aspx" }
+        });
+        pageHtml = await pageResp.text();
+    } catch (e) {
+        // Step1 失敗，直接 fallback GET
+        return await simpleGetSearch(model);
+    }
+
+    // 建立 POST 表單資料
+    const formFields = extractHiddenFields(pageHtml);
+    const selectNames = extractSelectNames(pageHtml);
+    const keywordField = extractFirstTextInput(pageHtml);
+    const submitBtn = extractSubmitButton(pageHtml);
+
+    // 所有 select 設為空字串（= 全部）
+    for (const sel of selectNames) formFields[sel] = "";
+    if (keywordField) formFields[keywordField] = model;
+    if (submitBtn) formFields[submitBtn.name] = submitBtn.value;
+
+    const body = new URLSearchParams(formFields).toString();
+
+    // === Step 2: POST 搜尋 ===
+    try {
+        const searchResp = await robustFetch("/list.aspx", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": TARGET_HTTP + "/list.aspx",
+            },
+            body,
+        });
+
+        const html = await searchResp.text();
+        const link = findProductLink(html);
+        if (link) return link;
+    } catch (e) {
+        // POST 失敗，繼續 fallback
+    }
+
+    return await simpleGetSearch(model);
+}
+
+async function simpleGetSearch(model) {
+    const paramSets = [
+        `key2=${encodeURIComponent(model)}`,
+        `key2=${encodeURIComponent(model)}&Type=&RANK=&con=`,
+        `key2=${encodeURIComponent(model)}&Type=0&RANK=0&con=0`,
+    ];
+    for (const params of paramSets) {
+        try {
+            const resp = await robustFetch(`/list.aspx?${params}`);
+            const html = await resp.text();
+            const link = findProductLink(html);
+            if (link) return link;
+        } catch (e) {
+            // 繼續下一個
+        }
+    }
+    return null;
+}
+
+function findProductLink(html) {
+    const re = /href="([^"]*upt\.aspx\?[^"]*id=\d+[^"]*)"/i;
+    const m = re.exec(html);
     return m ? m[1] : null;
 }
 
 async function fetchModelImage(model) {
     try {
-        const listUrl = `${TARGET_BASE_URL}/list.aspx`;
+        const href = await searchModel(model);
 
-        // Step 1: GET the page to capture form state
-        const pageResp = await fetch(listUrl, { headers: HEADERS });
-        if (!pageResp.ok) {
-            return await simpleFetch(model);
-        }
-        const pageHtml = await pageResp.text();
-
-        // Extract ASP.NET fields
-        const aspFields = extractAspNetFields(pageHtml);
-        const selects = findSelectNames(pageHtml);
-        const textInput = findTextInputName(pageHtml);
-        const submitBtn = findSubmitButtonName(pageHtml);
-
-        // Build form data
-        const formData = new URLSearchParams();
-
-        // Add ASP.NET hidden fields
-        for (const [key, value] of Object.entries(aspFields)) {
-            formData.set(key, value);
+        if (!href) {
+            return { status: "error", message: "找不到該型號（官網搜尋無結果）" };
         }
 
-        // Set all select dropdowns to empty (= all / 全部)
-        for (const sel of selects) {
-            formData.set(sel, '');
+        const p0Match = href.match(/p0=(\d+)/);
+        const idMatch = href.match(/id=(\d+)/);
+
+        if (!p0Match || !idMatch) {
+            return { status: "error", message: "無法解析產品連結參數" };
         }
 
-        // Set keyword
-        if (textInput) {
-            formData.set(textInput, model);
-        }
-
-        // Click search button
-        if (submitBtn) {
-            formData.set(submitBtn, '搜尋');
-        }
-
-        // Step 2: POST the search
-        const searchResp = await fetch(listUrl, {
-            method: 'POST',
-            headers: {
-                ...HEADERS,
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Referer': listUrl,
-            },
-            body: formData.toString(),
+        const imgPath = `/ImgViewer.ashx?applyID=${idMatch[1]}&goodID=${p0Match[1]}`;
+        const imgResp = await robustFetch(imgPath, {
+            headers: { Referer: TARGET_HTTP + "/list.aspx" }
         });
 
-        let resultHtml;
-        if (searchResp.ok) {
-            resultHtml = await searchResp.text();
-        } else {
-            return await simpleFetch(model);
+        if (!imgResp.ok) {
+            return { status: "error", message: `圖檔請求失敗 (HTTP ${imgResp.status})` };
         }
 
-        // Find product links in the result
-        let linkPattern = /href="([^"]*upt\.aspx\?[^"]*id=\d+[^"]*)"/gi;
-        let linkMatch = linkPattern.exec(resultHtml);
+        const imgHtml = await imgResp.text();
+        const b64Match = /src="data:image\/[^;]+;base64,([^"]{100,})"/i.exec(imgHtml);
 
-        // If POST didn't find results, try simple GET fallback
-        if (!linkMatch) {
-            return await simpleFetch(model);
+        if (!b64Match) {
+            return { status: "error", message: "無法從頁面取得標章圖檔" };
         }
 
-        return await fetchImage(linkMatch[1]);
+        return { status: "success", message: "已取得圖檔", imageData: b64Match[1] };
 
-    } catch (error) {
-        // Last resort fallback
-        try {
-            return await simpleFetch(model);
-        } catch (e) {
-            return { status: "error", message: `發生錯誤: ${error.message}` };
-        }
+    } catch (err) {
+        return { status: "error", message: `發生錯誤: ${err.message}` };
     }
-}
-
-async function simpleFetch(model) {
-    const url = `${TARGET_BASE_URL}/list.aspx?key2=${encodeURIComponent(model)}`;
-    const resp = await fetch(url, { headers: HEADERS });
-    if (!resp.ok) {
-        return { status: "error", message: `網站連線失敗 (HTTP ${resp.status})` };
-    }
-    const html = await resp.text();
-    const linkPattern = /href="([^"]*upt\.aspx\?[^"]*id=\d+[^"]*)"/gi;
-    const match = linkPattern.exec(html);
-    if (!match) {
-        return { status: "error", message: "找不到該型號的分級資料" };
-    }
-    return await fetchImage(match[1]);
-}
-
-async function fetchImage(href) {
-    const p0Match = href.match(/p0=(\d+)/);
-    const idMatch = href.match(/id=(\d+)/);
-
-    if (!p0Match || !idMatch) {
-        return { status: "error", message: "無法解析產品編號" };
-    }
-
-    const imgUrl = `${TARGET_BASE_URL}/ImgViewer.ashx?applyID=${idMatch[1]}&goodID=${p0Match[1]}`;
-    const imgResponse = await fetch(imgUrl, { headers: HEADERS });
-
-    if (!imgResponse.ok) {
-        return { status: "error", message: `無法取得圖檔 (HTTP ${imgResponse.status})` };
-    }
-
-    const imgHtml = await imgResponse.text();
-    const base64Pattern = /src="data:image\/[^;]+;base64,([^"]+)"/i;
-    const base64Match = base64Pattern.exec(imgHtml);
-
-    if (!base64Match || base64Match[1].length < 100) {
-        return { status: "error", message: "無法從頁面取得標章圖檔" };
-    }
-
-    return {
-        status: "success",
-        message: "已取得圖檔",
-        imageData: base64Match[1]
-    };
 }
 
 export async function onRequest(context) {
     const { request } = context;
 
-    const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-    };
-
-    if (request.method === 'OPTIONS') {
-        return new Response(null, { status: 204, headers: corsHeaders });
+    if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: CORS });
     }
 
-    if (request.method !== 'POST') {
-        return new Response(JSON.stringify({ error: '僅支援 POST 請求' }), {
-            status: 405,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    if (request.method !== "POST") {
+        return new Response(JSON.stringify({ error: "僅支援 POST" }), {
+            status: 405, headers: { "Content-Type": "application/json", ...CORS }
         });
     }
 
     try {
-        const data = await request.json();
-        const models = data.models || [];
-
-        if (!Array.isArray(models) || models.length === 0) {
-            return new Response(JSON.stringify({ error: '未提供型號清單' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        const { models = [] } = await request.json();
+        if (!models.length) {
+            return new Response(JSON.stringify({ error: "未提供型號" }), {
+                status: 400, headers: { "Content-Type": "application/json", ...CORS }
             });
         }
 
-        const limitedModels = models.slice(0, 10);
         const results = [];
-
-        for (const model of limitedModels) {
-            const trimmed = model.trim();
-            if (trimmed) {
-                const result = await fetchModelImage(trimmed);
-                results.push({ model: trimmed, result });
-                await new Promise(r => setTimeout(r, 300));
-            }
+        for (const raw of models.slice(0, 10)) {
+            const model = raw.trim();
+            if (!model) continue;
+            const result = await fetchModelImage(model);
+            results.push({ model, result });
+            await new Promise(r => setTimeout(r, 400));
         }
 
         return new Response(JSON.stringify({ results }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            status: 200, headers: { "Content-Type": "application/json", ...CORS }
         });
 
-    } catch (error) {
-        return new Response(JSON.stringify({ error: `伺服器錯誤: ${error.message}` }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    } catch (err) {
+        return new Response(JSON.stringify({ error: `伺服器錯誤: ${err.message}` }), {
+            status: 500, headers: { "Content-Type": "application/json", ...CORS }
         });
     }
 }
