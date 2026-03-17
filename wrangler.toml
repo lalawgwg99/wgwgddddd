@@ -1,0 +1,6 @@
+name = "energy-label-saver"
+compatibility_date = "2024-01-15"
+
+# Cloudflare Pages will auto-detect:
+# - /public as the static assets directory
+# - /functions as the Pages Functions directory

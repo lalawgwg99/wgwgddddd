@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Label Saver</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700;900&family=Noto+Sans+TC:wght@300;400;500&display=swap');
+
+        :root {
+            --bg: #FAFAF8;
+            --surface: #FFFFFF;
+            --text: #1A1A1A;
+            --text-light: #999999;
+            --text-mid: #666666;
+            --border: #E8E8E6;
+            --accent: #1A1A1A;
+            --accent-hover: #333333;
+            --success: #2D8A4E;
+            --error: #C0392B;
+            --serif: 'Noto Serif TC', 'Georgia', 'Times New Roman', serif;
+            --sans: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #111110;
+                --surface: #1A1A19;
+                --text: #E8E8E6;
+                --text-light: #666666;
+                --text-mid: #999999;
+                --border: #2A2A28;
+                --accent: #E8E8E6;
+                --accent-hover: #CCCCCC;
+                --success: #4CAF7D;
+                --error: #E57373;
+            }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--sans);
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 540px;
+            padding: 80px 24px 40px;
+            flex: 1;
+        }
+
+        .masthead {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+
+        .masthead-rule {
+            width: 48px;
+            height: 1.5px;
+            background: var(--text);
+            margin: 0 auto 20px;
+        }
+
+        .masthead h1 {
+            font-family: var(--serif);
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            margin-bottom: 12px;
+        }
+
+        .masthead .tagline {
+            font-size: 13px;
+            font-weight: 300;
+            color: var(--text-light);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .section-label {
+            font-size: 10px;
+            font-weight: 500;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .input-section { margin-bottom: 40px; }
+
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            font-family: var(--sans);
+            font-size: 15px;
+            font-weight: 300;
+            color: var(--text);
+            resize: none;
+            min-height: 140px;
+            line-height: 1.8;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus { border-color: var(--text); }
+        textarea::placeholder { color: var(--text-light); font-weight: 300; }
+
+        .action-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 48px;
+        }
+
+        .mode-badge {
+            font-size: 10px;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-light);
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 2px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            padding: 14px 32px;
+            font-family: var(--sans);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+        .spinner {
+            width: 12px; height: 12px;
+            border: 1.5px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .spinner { border-color: rgba(0,0,0,0.3); border-top-color: #000; }
+        }
+
+        .btn-primary.loading .spinner { display: block; }
+        .btn-primary.loading .btn-label { display: none; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .results-section { display: none; }
+
+        .results-section .section-label {
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 0;
+        }
+
+        .result-list { list-style: none; }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        .result-model { font-weight: 400; letter-spacing: 0.02em; }
+
+        .result-status {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; font-weight: 300; color: var(--text-light);
+        }
+
+        .status-indicator { width: 6px; height: 6px; border-radius: 50%; background: var(--text-light); }
+        .status-indicator.success { background: var(--success); }
+        .status-indicator.error { background: var(--error); }
+        .status-indicator.pending { background: #D4A843; animation: pulse 1.5s ease-in-out infinite; }
+
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        .error-text { color: var(--error); }
+
+        .footer {
+            text-align: center;
+            padding: 40px 24px 32px;
+            width: 100%;
+        }
+
+        .footer-rule {
+            width: 32px; height: 1px;
+            background: var(--border);
+            margin: 0 auto 16px;
+        }
+
+        .footer-brand {
+            font-family: var(--serif);
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            color: var(--text-light);
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+    <header class="masthead">
+        <div class="masthead-rule"></div>
+        <h1>能效標章</h1>
+        <div class="tagline">Energy Label Saver</div>
+    </header>
+
+    <div class="input-section">
+        <div class="section-label">產品型號</div>
+        <textarea id="models" placeholder="每行輸入一組型號&#10;RXV50ZVLT&#10;RXV60ZVLT"></textarea>
+    </div>
+
+    <div class="action-row">
+        <div class="mode-badge">雲端模式</div>
+        <button id="downloadBtn" class="btn-primary" onclick="startDownload()">
+            <span class="btn-label">搜尋並下載</span>
+            <div class="spinner"></div>
+        </button>
+    </div>
+
+    <div id="resultsSection" class="results-section">
+        <div class="section-label">下載進度</div>
+        <ul id="resultList" class="result-list"></ul>
+    </div>
+</div>
+
+<footer class="footer">
+    <div class="footer-rule"></div>
+    <div class="footer-brand">ＷＧ德</div>
+</footer>
+
+<script>
+    async function startDownload() {
+        const textarea = document.getElementById('models');
+        const btn = document.getElementById('downloadBtn');
+        const section = document.getElementById('resultsSection');
+        const list = document.getElementById('resultList');
+
+        const text = textarea.value.trim();
+        if (!text) { textarea.focus(); return; }
+
+        const models = text.split('\n').map(m => m.trim()).filter(Boolean);
+        if (!models.length) return;
+
+        btn.classList.add('loading');
+        btn.disabled = true;
+        section.style.display = 'block';
+        list.innerHTML = '';
+
+        models.forEach(model => {
+            const li = document.createElement('li');
+            li.className = 'result-item';
+            li.id = 'r-' + model.replace(/[^a-zA-Z0-9]/g, '_');
+            li.innerHTML = `
+                <div class="result-model">${model}</div>
+                <div class="result-status">
+                    <div class="status-indicator pending"></div>
+                    <span class="status-text">處理中</span>
+                </div>`;
+            list.appendChild(li);
+        });
+
+        try {
+            const r = await fetch('/api/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ models })
+            });
+            const data = await r.json();
+
+            if (r.ok) {
+                data.results.forEach(res => {
+                    const id = 'r-' + res.model.replace(/[^a-zA-Z0-9]/g, '_');
+                    const li = document.getElementById(id);
+                    if (!li) return;
+                    const dot = li.querySelector('.status-indicator');
+                    const txt = li.querySelector('.status-text');
+                    dot.className = 'status-indicator';
+
+                    if (res.result.status === 'success') {
+                        dot.classList.add('success');
+                        txt.textContent = '已下載';
+                        if (res.result.imageData) triggerDownload(res.model, res.result.imageData);
+                    } else {
+                        dot.classList.add('error');
+                        txt.textContent = res.result.message;
+                        txt.classList.add('error-text');
+                    }
+                });
+            } else {
+                alert(data.error || data.detail || '請求失敗');
+            }
+        } catch (e) {
+            alert('連線錯誤: ' + e.message);
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+
+    function triggerDownload(model, base64Data) {
+        try {
+            const bin = atob(base64Data);
+            const arr = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+            const blob = new Blob([arr], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = model.replace('/', '_') + '.jpg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 200);
+        } catch (e) {
+            console.error('Download failed:', model, e);
+        }
+    }
+</script>
+
+</body>
+</html>

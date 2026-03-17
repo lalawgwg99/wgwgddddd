@@ -1,0 +1,13 @@
+{
+  "name": "energy-label-saver",
+  "version": "2.0.0",
+  "description": "Energy Label Saver - 能效標章圖檔下載工具",
+  "private": true,
+  "scripts": {
+    "dev": "npx wrangler pages dev public",
+    "deploy": "npx wrangler pages deploy public"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
